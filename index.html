@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#b8dcec"><meta name="description" content="A little birthday adventure, made with love for Dad.">
+  <title>Dad's Day · Happy Birthday</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%23f4c64e'/%3E%3Ctext x='24' y='34' text-anchor='middle' font-size='34'%3ED%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"./assets/three.module.js","three/addons/utils/BufferGeometryUtils.js":"./assets/BufferGeometryUtils.js"}}</script>
+</head>
+<body>
+  <main id="app" aria-label="Dad's birthday adventure">
+    <canvas id="world" aria-label="A three-dimensional view of home, with Dad on the front steps and his two cars in the driveway"></canvas>
+    <header><div class="heading"><span class="eyebrow">TODAY IS ALL YOURS</span><h1>Happy birthday, Dad<span>!</span></h1></div><div class="utilities"><button id="reset" title="Start again" aria-label="Start again"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/></svg></button><button id="fullscreen" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button></div></header>
+    <nav id="choices" aria-label="Choose something to do">
+      <button class="choice" id="movie" data-mode="movie" aria-pressed="false"><span class="choice-icon"><svg viewBox="0 0 32 32"><path d="M3 12h26v15H3zM3 12l-1-6 25-4 1 6zM9 5l4 5m5-7 4 5"/><path d="m13 16 7 4-7 4z"/></svg></span><span>Movie night</span><span class="choice-dot"></span></button>
+      <button class="choice" id="gym" data-mode="gym" aria-pressed="false"><span class="choice-icon"><svg viewBox="0 0 32 32"><path d="m11 21 10-10M4 20l8 8M3 25l4 4M20 4l8 8m-3-9 4 4M7 17l8 8m2-18 8 8"/></svg></span><span>Hit the gym</span><span class="choice-dot"></span></button>
+      <button class="choice" id="drive" data-mode="drive" aria-pressed="false"><span class="choice-icon"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/><circle cx="16" cy="16" r="3"/><path d="M4 14h9m6 0h9M16 19v9M7 8c5 3 13 3 18 0"/></svg></span><span>Take a drive</span><span class="choice-dot"></span></button>
+    </nav>
+    <button id="destination" hidden><span id="destination-label">Come on in</span><span class="target-ring"></span></button>
+    <div id="hint" class="hint" role="status" aria-live="polite"><span class="hint-spark">✦</span><span id="hint-text">A whole day of your favorite things. Pick one.</span></div>
+    <p class="rotate-hint">A little more room to play? Turn your phone sideways.</p>
+    <footer><span>MADE WITH LOVE, JUST FOR YOU</span><span id="chapter">HOME SWEET HOME</span></footer>
+    <div id="loading"><div class="loader-mark">D<span>✦</span></div><p>Getting your day ready…</p></div>
+    <div id="curtain"></div>
+    <section id="ending" hidden aria-labelledby="end-title"><div class="end-card"><span class="eyebrow" id="end-kicker">THE BEST PART</span><h2 id="end-title">Time together.</h2><p id="end-copy">The best days are the ones we spend together.<br>Happy birthday, Dad.</p><button id="home">Back to the house <span>↗</span></button></div></section>
+    <section id="error" hidden><h2>Your birthday adventure needs 3D graphics.</h2><p>Try opening this page in a recent version of Safari, Chrome, or Edge.</p><button onclick="location.reload()">Try again</button></section>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
