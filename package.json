@@ -1,0 +1,1 @@
+{"name":"dads-day","private":true,"type":"module","scripts":{"serve":"python -m http.server 4173 --directory dist","check":"node --check dist/main.js && node --check dist/house.js && node --check dist/assets/avatar.js && node --check dist/assets/cars.js"}}
