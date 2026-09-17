@@ -198,6 +198,18 @@ export async function createDad(options = {}) {
     const rotation=new THREE.Quaternion().setFromRotationMatrix(target.multiply(source.invert()));
     rotation.premultiply(model.getWorldQuaternion(new THREE.Quaternion()));worldOrientation(wrist,rotation);
   }
+  function applyHandCurl(side,amount){
+    const sign=side==='L'?1:-1;
+    const curlAxis=new THREE.Vector3(sign*.388,-.441,-.809).normalize();
+    for(let finger=2;finger<=5;finger++){
+      boneMap[`finger${finger}-1.${side}`].quaternion.setFromAxisAngle(curlAxis,sign*amount*1.15);
+      boneMap[`finger${finger}-2.${side}`].quaternion.setFromAxisAngle(curlAxis,sign*amount*1.30);
+      boneMap[`finger${finger}-3.${side}`].quaternion.setFromAxisAngle(curlAxis,sign*amount*0.95);
+    }
+    boneMap[`finger1-1.${side}`].quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),sign*amount*0.42);
+    boneMap[`finger1-2.${side}`].quaternion.setFromAxisAngle(curlAxis,-sign*amount*0.65);
+    boneMap[`finger1-3.${side}`].quaternion.setFromAxisAngle(curlAxis,-sign*amount*0.65);
+  }
   function animateWorkout(time){
     const t=THREE.MathUtils.clamp(time,0,29),toGrip=eased(t,.7,2.2),lift=eased(t,2.2,4),clean=eased(t,4,5.1),press=eased(t,5.1,6.2);
     const floorIn=eased(t,10.2,11.8),floorOut=eased(t,20,21.2),floorWeight=floorIn*(1-floorOut);
@@ -246,8 +258,10 @@ export async function createDad(options = {}) {
       if(shrug>0){handF=handF.map((v,i)=>mix(v,[0,.25,.96][i],shrug));handN=handN.map((v,i)=>mix(v,[0,-1,0][i],shrug));}
       if(side==='L'&&watch>0){handF=handF.map((v,i)=>mix(v,[-.3,.7,.6][i],watch));handN=handN.map((v,i)=>mix(v,[.5,.6,-.6][i],watch));}
       orientWorkoutHand(side,handF,handN);
-      const curl=(1-floorWeight)*(held||toGrip>.8&&t<6.2||t>=25.8?.66:shrug>.2?.12:0);
-      for(let finger=2;finger<=5;finger++)for(let segment=2;segment<=3;segment++)boneMap[`finger${finger}-${segment}.${side}`].quaternion.setFromAxisAngle(new THREE.Vector3(side==='L'?.38:-.38,-.44,-.81).normalize(),side==='L'?-curl:curl);
+      const isBar=held||(toGrip>.8&&t<6.2)||t>=25.8;
+      const isWatch=side==='L'&&watch>0;
+      const curl=(1-floorWeight)*(isBar?1.0:isWatch?watch*1.0:shrug>.2?.12:0);
+      applyHandCurl(side,curl);
     }
     const lookUp=(eased(t,6.3,6.8)*(1-eased(t,8.45,8.75))+eased(t,24.85,25.25)*(1-eased(t,27.2,27.8)));
     boneMap.head.rotation.set(-.50*lookUp+.60*watch-.18*floorWeight,watch*.18,shrug*.075);
@@ -308,12 +322,17 @@ export async function createDad(options = {}) {
     const pose=poses[poseName]||{};
     for(const side of ['L','R'])for(const part of ['upperarm01','lowerarm01','wrist']){
       const name=part+'.'+side,b=boneMap[name];let target=pose[name]||[0,0,(part==='upperarm01'?(side==='L'?-.65:.65):0)];
+      if(wave&&side==='R'){
+        if(part==='upperarm01')target=[-1.22,-.15,-.75];
+        if(part==='lowerarm01')target=[-0.55,1.50,-1.05];
+        if(part==='wrist')target=[.55,.70,-.40];
+      }
       if(disco){const relaxed=poses.relaxed?.[name]||target,up=poses.wave?.[part+'.R']||target,mirror=side==='L'?[up[0],-up[1],-up[2]]:up;const lift=side==='R'?Math.max(raised,point*.86):(1-point)*.92*(1-raised*.65);target=relaxed.map((v,i)=>THREE.MathUtils.lerp(v,mirror[i],THREE.MathUtils.smoothstep(lift,.08,.92)));if(part==='upperarm01')target[0]+=Math.sin(beat)*.10;if(part==='wrist')target[2]+=Math.sin(beat*.5)*.08;}
       if(groove>0){const base=poses.movie?.[name]||target,up=poses.wave?.[part+'.R']||target,mirror=side==='L'?[up[0],-up[1],-up[2]]:up,pointWeight=side==='L'?pointL:pointR;const dance=base.map((v,i)=>mix(v,mirror[i],pointWeight));const pulse=Math.sin(grooveBeat*2+(side==='L'?0:Math.PI));if(part==='upperarm01'){dance[2]+=(side==='L'?-1:1)*(.10+pulse*.10)*(1-pointWeight);dance[0]+=pulse*.08;}if(part==='lowerarm01')dance[0]+=pulse*.20*(1-pointWeight);target=target.map((v,i)=>mix(v,dance[i],groove));}
       const stride=walk&&part==='upperarm01'?Math.sin(time*6.2+(side==='L'?0:Math.PI))*.17:0;
       b.rotation.x=THREE.MathUtils.lerp(b.rotation.x,target[0]+stride,k);
       b.rotation.y=THREE.MathUtils.lerp(b.rotation.y,target[1],k);
-      b.rotation.z=THREE.MathUtils.lerp(b.rotation.z,target[2]+(wave&&side==='R'&&part==='wrist'?Math.sin(time*5.5)*.14:0),k);
+      b.rotation.z=THREE.MathUtils.lerp(b.rotation.z,target[2],k);
     }
     boneMap.head.rotation.x=THREE.MathUtils.lerp(boneMap.head.rotation.x,disco?-.025+Math.sin(beat*2)*.025:driving?0:think?-.035:-.015,k);
     boneMap.head.rotation.y=THREE.MathUtils.lerp(boneMap.head.rotation.y,disco?Math.sin(beat*.5)*.13:driving?0:think?Math.sin(time*.42)*.14:selected?.04:Math.sin(time*.35)*.04,k);
@@ -341,6 +360,7 @@ export async function createDad(options = {}) {
       b.quaternion.slerp(new THREE.Quaternion().setFromAxisAngle(curlAxis,curl),k);
       boneMap[`finger${finger}-${segment}.L`].quaternion.slerp(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(.38,-.44,-.81).normalize(),disco?(groove>0?(pointL>.5?(finger===2?0:-.65):-.25):(finger===2?0:-.70)):driving?-.32:0),k);
     }
+    if(wave)applyHandCurl('R',1.0);
     model.position.x=disco?mix(Math.sin(beat)*.035,Math.sin(grooveBeat)*.14,groove):0;
     model.position.y=.026+(disco?mix(-.013+Math.cos(beat*2)*.007,-.023+Math.cos(grooveBeat*2)*.018,groove):driving?0:walk?Math.abs(Math.sin(time*6.2))*.012:Math.sin(time*1.65)*.004);
     if(groove>0){model.updateWorldMatrix(true,true);for(const side of ['L','R']){const sign=side==='L'?1:-1,step=Math.max(0,Math.sin(grooveBeat+(side==='L'?0:Math.PI))),lift=Math.sin(step*Math.PI)*.095;const a=boneMap['upperleg01.'+side],b=boneMap['lowerleg01.'+side],beforeA=a.quaternion.clone(),beforeB=b.quaternion.clone();a.quaternion.identity();b.quaternion.identity();model.updateWorldMatrix(true,true);solveLimb('upperleg01.'+side,'lowerleg01.'+side,'foot.'+side,[sign*(.25+.14*step)-model.position.x,.127+lift-model.position.y,.02+.075*step],[sign*.3,.6,.58]);a.quaternion.slerpQuaternions(beforeA,a.quaternion.clone(),groove);b.quaternion.slerpQuaternions(beforeB,b.quaternion.clone(),groove);worldOrientation(boneMap['foot.'+side],model.getWorldQuaternion(new THREE.Quaternion()));}}
