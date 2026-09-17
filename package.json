@@ -1,1 +1,10 @@
-{"name":"dads-day","private":true,"type":"module","scripts":{"serve":"python -m http.server 4173 --directory dist","check":"node --check dist/main.js && node --check dist/house.js && node --check dist/assets/avatar.js && node --check dist/assets/cars.js"}}
+{
+  "name": "dads-day",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python -m http.server 4173 --directory dist",
+    "check": "node --check dist/main.js && node --check dist/house.js && node --check dist/rendering.js && node --check dist/foliage.js && node --check dist/grass.js && node --check dist/party.js && node --check dist/celebration-stage.js && node --check dist/cinema.js && node --check dist/cameo-sequence.js && node --check dist/song-wheel.js && node --check dist/assets/avatar-v2.js && node --check dist/assets/cars-v3.js && node --check dist/assets/v2/moonwalk-cameo.js && node --check dist/gym-scene.js && node --check dist/highway-scene.js",
+    "test": "node --test tests/*.test.js"
+  }
+}
