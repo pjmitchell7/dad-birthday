@@ -20,6 +20,6 @@ Run `npm run serve`, then open `http://localhost:4173`. No build step or API key
 
 The character uses a continuous CC0 MakeHuman mesh and skeleton, with fitted clothing and animated outfits. The cars are stylized procedural likenesses. The scene includes grass blades over a sloping left lawn, layered trees, mapped brickwork and soft contact shadows. These are short animated birthday vignettes, not full game levels. Portrait works without requiring device orientation lock. No reference photos, addresses or license plates are included in the published assets.
 
-The static output is in `dist`. Third-party licenses and provenance are in `dist/assets`. The private preview requires its owner's access; recipient sharing must be configured separately. The local preview is available independently of the hosting deployment.
+The static output is in `dist`. Third-party licenses and provenance are in `dist/assets`. The finished birthday website is configured for anyone with the link, as requested. The local preview is available independently of the hosting deployment.
 
 The five music files and Marvel video were supplied by the user for this birthday project. They are included unchanged; they are separate from the CC0 model assets and are not covered by their license.
