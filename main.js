@@ -5,8 +5,8 @@ import { createParty } from './party.js';
 import { createSongWheel } from './song-wheel.js';
 import { createHighwayScene } from './highway-scene.js';
 import { createGymScene } from './gym-scene.js';
-import { createDad } from './assets/avatar-v2.js?v=2';
-import { createCar } from './assets/cars-v3.js';
+import { createDad } from './assets/avatar-v2.js?v=3';
+import { createCar } from './assets/cars-v3.js?v=3';
 import { mergeStaticChildren } from './assets/mergeStaticChildren.js';
 import { loadSurfaces, applySurfaces } from './surfaces.js';
 import { setSky, createPipeline } from './rendering.js';
@@ -88,7 +88,7 @@ function tick(){globalTime=(performance.now()-start)/1000;const frameDelta=Math.
  if(phase==='selected')pose='selected';
  if(phase==='enter'){pose='walk';home.doorPivot.rotation.y=-smooth(elapsed/.65)*1.5;dad.group.rotation.y=Math.PI;dad.group.position.z=2.9-smooth(elapsed/1.65)*1.1;if(elapsed>1.5)$('curtain').classList.add('closed');if(elapsed>2.15){showCinema();phase='cinema';phaseStart=globalTime;elapsed=0;$('curtain').classList.remove('closed');}}
  if(phase==='cinema'){pose='seated';cinemaData.update(elapsed,camera.aspect);camera.position.copy(cinemaData.cameraPosition);camera.lookAt(cinemaData.cameraTarget);if(elapsed>1.15&&!movieStarted)playMovie();}
- if(phase==='walk'){pose='walk';walkingPath(smooth(elapsed/3.4),activeCar);if(elapsed>3.45){const scale=.66,seat=activeCar.group.userData.driverPosition?.clone()||new THREE.Vector3(-.4,.75,-.28);activeCar.group.add(dad.group);dad.group.scale.setScalar(scale);dad.group.position.copy(seat).sub(new THREE.Vector3(...dad.group.userData.drivingHipOffset).multiplyScalar(scale));dad.group.rotation.set(0,0,0);dad.group.visible=true;phase='driving';phaseStart=globalTime;elapsed=0;}}
+ if(phase==='walk'){pose='walk';walkingPath(smooth(elapsed/3.4),activeCar);if(elapsed>3.45){const scale=.66,seat=activeCar.group.userData.driverPosition?.clone()||new THREE.Vector3(-.38,.44,-.28);activeCar.group.add(dad.group);dad.group.scale.setScalar(scale);dad.group.position.copy(seat).sub(new THREE.Vector3(...dad.group.userData.drivingHipOffset).multiplyScalar(scale));dad.group.rotation.set(0,0,0);dad.group.visible=true;phase='driving';phaseStart=globalTime;elapsed=0;}}
  if(phase==='driving'){pose='driving';const car=activeCar.group,park=selected==='gym'?parked.silver:parked.blue;const d=elapsed*elapsed*.6;if(d<5.7){car.position.z=park.z+d;car.position.x=park.x;}else{const turn=clamp((d-5.7)/3.2,0,1);car.rotation.y=-turn*Math.PI/2;car.position.z=park.z+5.7+Math.sin(turn*Math.PI/2)*2;car.position.x=park.x-(1-Math.cos(turn*Math.PI/2))*2-Math.max(0,d-8.9)*1.7;}activeCar.animate(elapsed*4,globalTime);if(elapsed>4.7)$('curtain').classList.add('closed');if(elapsed>5.35){if(selected==='drive'){showHighway();phase='highway';}else{showGym();phase='gym-scene';}phaseStart=globalTime;elapsed=0;$('curtain').classList.remove('closed');}}
  if(phase==='gym-scene'){gymScene.update(elapsed);pose=gymScene.pose;animationTime=gymScene.animationTime;const position=gymScene.cameraPosition.clone();if(camera.aspect<1.2)position.addScaledVector(position.clone().sub(gymScene.cameraTarget).normalize(),(1.2/camera.aspect-1)*4);camera.position.copy(position);camera.lookAt(gymScene.cameraTarget);if(elapsed>=gymScene.duration)finish();}
  if(phase==='highway'){highway.update(elapsed);pose=highway.pose;animationTime=highway.animationTime;const position=highway.cameraPosition.clone();if(camera.aspect<1.2)position.addScaledVector(position.clone().sub(highway.cameraTarget).normalize(),(1.2/camera.aspect-1)*5);camera.position.copy(position);camera.lookAt(highway.cameraTarget);if(elapsed>=highway.duration)finish();}

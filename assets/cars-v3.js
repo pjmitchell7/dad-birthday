@@ -232,6 +232,7 @@ export function createCar(kind = 'silver') {
     const steering = mesh(new THREE.TorusGeometry(.145,.017,8,28),materials.black);
     steering.position.set(-.37,1.26,.19); steering.rotation.x=-.3;
     tube([[-.48,1.28,.19],[-.37,1.245,.19],[-.26,1.28,.19]],.012,materials.chrome);
+    group.userData.driverPosition = new THREE.Vector3(-.38, .53, -.28);
     // Fastback: low rounded roof and a continuous black glazing ribbon.
     const roofRows = [];
     for (let j = 0; j <= 24; j++) {
