@@ -5,7 +5,7 @@ import { createParty } from './party.js';
 import { createSongWheel } from './song-wheel.js';
 import { createHighwayScene } from './highway-scene.js';
 import { createGymScene } from './gym-scene.js';
-import { createDad } from './assets/avatar-v2.js';
+import { createDad } from './assets/avatar-v2.js?v=2';
 import { createCar } from './assets/cars-v3.js';
 import { mergeStaticChildren } from './assets/mergeStaticChildren.js';
 import { loadSurfaces, applySurfaces } from './surfaces.js';
