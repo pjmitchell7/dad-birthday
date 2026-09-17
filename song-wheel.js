@@ -21,6 +21,9 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
   if (!audio.getAttribute('src')) audio.src = selected.src;
   let returnFocus = null, error = '', pending = false, playToken = 0, wantsPlayback = false, lastPlaybackState = '';
   const songsOpener = document.getElementById('party-songs'), muteButton = document.getElementById('party-mute');
+  let currentIndex = TRACKS.indexOf(selected);
+  let autoTimer = null, pauseUntil = 0;
+
   const dialog = document.createElement('dialog');
   dialog.id = 'song-wheel-dialog';
   dialog.className = 'song-wheel';
@@ -28,65 +31,193 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
   dialog.setAttribute('aria-describedby', 'song-wheel-description');
   dialog.innerHTML = `
     <div class="sw-panel">
-      <button class="sw-close" type="button" aria-label="Close song wheel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <button class="sw-close" type="button" aria-label="Close song selection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       <div class="sw-heading">
-        <span class="sw-eyebrow">DAD’S DISCO</span>
-        <h2 id="song-wheel-title">Pick the next song.</h2>
-        <p id="song-wheel-description">Your favorites. Your dance floor.</p>
+        <span class="sw-eyebrow">DAD’S VINYL JUKEBOX</span>
+        <h2 id="song-wheel-title">Pick the Next Record</h2>
+        <p id="song-wheel-description">Rotate the carousel to choose a track for the dance floor.</p>
       </div>
-      <div class="sw-orbit" role="group" aria-label="Choose a song">
-        <div class="sw-orbit-line" aria-hidden="true"></div>
-        <button class="sw-record" type="button" aria-label="Play music">
-          <span class="sw-record-disc" aria-hidden="true"></span>
-          <span class="sw-record-label" aria-hidden="true"><span>DAD’S<br>MIX</span><svg class="sw-record-icon" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z"/></svg></span>
+
+      <div class="sw-carousel-stage" role="region" aria-label="Song records carousel">
+        <button class="sw-carousel-arrow sw-prev" type="button" aria-label="Previous record">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+
+        <div class="sw-carousel-viewport">
+          <div class="sw-carousel-track"></div>
+        </div>
+
+        <button class="sw-carousel-arrow sw-next" type="button" aria-label="Next record">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
+
+      <div class="sw-pagination" role="tablist" aria-label="Choose track directly"></div>
+
+      <div class="sw-hero-card">
+        <div class="sw-hero-info">
+          <span class="sw-hero-badge" id="sw-hero-badge">NOW PLAYING</span>
+          <h3 class="sw-hero-title" id="sw-hero-title">Stayin’ Alive</h3>
+          <p class="sw-hero-artist" id="sw-hero-artist">Bee Gees</p>
+        </div>
+        <button class="sw-hero-play" type="button" id="sw-hero-play" aria-label="Play or pause selected track">
+          <span class="sw-hero-play-icon" aria-hidden="true">▶</span>
+          <span class="sw-hero-play-text">Play Record</span>
+        </button>
+      </div>
+
       <div class="sw-footer">
         <p class="sw-now" role="status" aria-live="polite" aria-atomic="true"></p>
         <button class="sw-retry" type="button" hidden>Play music <span aria-hidden="true">▶</span></button>
       </div>
     </div>`;
+
   app.append(dialog);
   songsOpener?.setAttribute('aria-haspopup', 'dialog');
   songsOpener?.setAttribute('aria-controls', dialog.id);
   songsOpener?.setAttribute('aria-expanded', 'false');
-  const orbit = dialog.querySelector('.sw-orbit'), record = dialog.querySelector('.sw-record');
-  const icon = dialog.querySelector('.sw-record-icon'), now = dialog.querySelector('.sw-now');
-  const retry = dialog.querySelector('.sw-retry'), closeButton = dialog.querySelector('.sw-close');
-  const songButtons = TRACKS.map((track, index) => {
+
+  const trackContainer = dialog.querySelector('.sw-carousel-track');
+  const pagination = dialog.querySelector('.sw-pagination');
+  const heroBadge = dialog.querySelector('#sw-hero-badge');
+  const heroTitle = dialog.querySelector('#sw-hero-title');
+  const heroArtist = dialog.querySelector('#sw-hero-artist');
+  const heroPlayBtn = dialog.querySelector('#sw-hero-play');
+  const heroPlayIcon = dialog.querySelector('.sw-hero-play-icon');
+  const heroPlayText = dialog.querySelector('.sw-hero-play-text');
+  const prevBtn = dialog.querySelector('.sw-prev');
+  const nextBtn = dialog.querySelector('.sw-next');
+  const closeButton = dialog.querySelector('.sw-close');
+  const now = dialog.querySelector('.sw-now');
+  const retry = dialog.querySelector('.sw-retry');
+
+  const recordButtons = TRACKS.map((track, index) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `sw-song sw-song-${index}`;
-    button.style.setProperty('--song-color', track.color);
-    button.setAttribute('aria-label', `${track.title}, ${track.artist}`);
-    const title = document.createElement('span');
-    title.className = 'sw-song-title'; title.textContent = track.title;
-    const artist = document.createElement('span');
-    artist.className = 'sw-song-artist'; artist.textContent = track.artist;
-    const mark = document.createElement('span');
-    mark.className = 'sw-selected-mark'; mark.textContent = '✓'; mark.setAttribute('aria-hidden', 'true');
-    button.append(title, artist, mark);
-    button.addEventListener('click', () => selectTrack(track));
-    orbit.append(button);
+    button.className = `sw-record-item sw-record-${index}`;
+    button.style.setProperty('--track-color', track.color);
+    button.setAttribute('aria-label', `${track.title} by ${track.artist}`);
+    button.dataset.index = String(index);
+
+    button.innerHTML = `
+      <div class="sw-disc-vinyl">
+        <div class="sw-disc-grooves"></div>
+        <div class="sw-disc-sheen"></div>
+        <div class="sw-disc-rim"></div>
+        <div class="sw-disc-label">
+          <span class="sw-label-arc">45 RPM · STEREO</span>
+          <span class="sw-label-title">${track.title}</span>
+          <span class="sw-label-artist">${track.artist}</span>
+          <span class="sw-label-hole"></span>
+        </div>
+      </div>
+      <div class="sw-disc-aura"></div>
+      <span class="sw-disc-badge" aria-hidden="true">✓</span>
+    `;
+
+    button.addEventListener('click', () => {
+      pauseAutoRotate(7000);
+      if (currentIndex !== index) {
+        currentIndex = index;
+        updateCarousel();
+        selectTrack(track);
+      } else {
+        togglePlayback();
+      }
+    });
+
+    trackContainer.append(button);
     return button;
   });
+
+  const dots = TRACKS.map((track, index) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'sw-dot';
+    dot.setAttribute('role', 'tab');
+    dot.setAttribute('aria-label', `Track ${index + 1}: ${track.title}`);
+    dot.style.setProperty('--dot-color', track.color);
+    dot.addEventListener('click', () => {
+      pauseAutoRotate(7000);
+      currentIndex = index;
+      updateCarousel();
+      selectTrack(track);
+    });
+    pagination.append(dot);
+    return dot;
+  });
+
+  function pauseAutoRotate(ms = 5000) {
+    pauseUntil = Date.now() + ms;
+  }
+
+  function stepCarousel(delta) {
+    currentIndex = (currentIndex + delta + TRACKS.length) % TRACKS.length;
+    updateCarousel();
+  }
+
+  function updateCarousel() {
+    const N = TRACKS.length;
+    const currentTrack = TRACKS[currentIndex];
+    const isPlaying = !audio.paused && !audio.ended && !error;
+
+    TRACKS.forEach((track, i) => {
+      let offset = (i - currentIndex) % N;
+      if (offset > 2) offset -= N;
+      if (offset < -2) offset += N;
+
+      const btn = recordButtons[i];
+      btn.dataset.offset = String(offset);
+      btn.classList.toggle('sw-center', offset === 0);
+      btn.classList.toggle('sw-active-track', track === selected);
+      btn.setAttribute('aria-pressed', String(track === selected));
+
+      dots[i].classList.toggle('sw-active', i === currentIndex);
+      dots[i].setAttribute('aria-selected', String(i === currentIndex));
+    });
+
+    heroTitle.textContent = currentTrack.title;
+    heroArtist.textContent = currentTrack.artist;
+
+    if (currentTrack === selected) {
+      heroBadge.textContent = isPlaying ? 'NOW PLAYING' : 'SELECTED';
+      heroBadge.style.color = currentTrack.color;
+      heroBadge.style.borderColor = currentTrack.color;
+      heroBadge.classList.add('sw-playing-badge');
+    } else {
+      heroBadge.textContent = 'READY TO PLAY';
+      heroBadge.style.color = '#c9c4db';
+      heroBadge.style.borderColor = 'rgba(255,255,255,0.2)';
+      heroBadge.classList.remove('sw-playing-badge');
+    }
+
+    if (currentTrack === selected && isPlaying) {
+      heroPlayIcon.textContent = '⏸';
+      heroPlayText.textContent = 'Pause Track';
+    } else {
+      heroPlayIcon.textContent = '▶';
+      heroPlayText.textContent = currentTrack === selected ? 'Resume Playback' : 'Play Record';
+    }
+  }
 
   function sync() {
     const playing = !audio.paused && !audio.ended && !error;
     dialog.classList.toggle('sw-playing', playing);
-    record.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} music: ${selected.title}`);
-    icon.innerHTML = playing ? '<path d="M7 5h3v14H7zm7 0h3v14h-3Z"/>' : '<path d="m8 5 11 7-11 7Z"/>';
-    songButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(TRACKS[i] === selected)));
+    songsOpener?.classList.toggle('sw-playing', playing);
+
+    updateCarousel();
+
     const status = error || `${pending ? 'Starting' : playing ? (audio.muted ? 'Playing · muted' : 'Now playing') : 'Selected'} · ${selected.title}`;
-    // Avoid unnecessary live-region announcements on repeated media events.
     if (now.textContent !== status) now.textContent = status;
     now.classList.toggle('sw-error', Boolean(error));
     retry.hidden = playing || pending;
     retry.textContent = error ? 'Play music again' : 'Play music';
+
     if (muteButton) {
       muteButton.textContent = playing ? (audio.muted ? 'Sound off' : 'Sound on') : 'Play music';
       muteButton.setAttribute('aria-label', playing ? (audio.muted ? 'Unmute music' : 'Mute music') : 'Play music');
     }
+
     const playbackState = JSON.stringify([playing, audio.muted, pending, error, selected.id]);
     if (playbackState !== lastPlaybackState) {
       lastPlaybackState = playbackState;
@@ -97,7 +228,6 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
   function play() {
     const token = ++playToken;
     wantsPlayback = true; error = ''; pending = true; sync();
-    // Start within the click gesture; never await another operation first.
     let result;
     try {
       if (audio.error) audio.load();
@@ -122,27 +252,45 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
   function selectTrack(track) {
     if (selected !== track) {
       selected = track;
-      // Changing src keeps the same audio element and its current mute setting.
       audio.src = track.src;
     }
+    currentIndex = TRACKS.indexOf(track);
     play();
-    close();
     onTrackChange(selected);
+  }
+
+  function startAutoRotate() {
+    stopAutoRotate();
+    autoTimer = setInterval(() => {
+      if (!dialog.open) return;
+      if (Date.now() < pauseUntil) return;
+      stepCarousel(1);
+    }, 4500);
+  }
+
+  function stopAutoRotate() {
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
   }
 
   function open(opener) {
     if (dialog.open) return;
     const candidate = opener?.currentTarget || opener;
     returnFocus = typeof candidate?.focus === 'function' ? candidate : (songsOpener || document.activeElement);
+    currentIndex = TRACKS.indexOf(selected);
     sync();
     dialog.showModal();
     songsOpener?.setAttribute('aria-expanded', 'true');
-    songButtons[TRACKS.indexOf(selected)].focus({ preventScroll: true });
+    recordButtons[currentIndex]?.focus({ preventScroll: true });
+    startAutoRotate();
   }
 
   function close() {
     if (dialog.open) dialog.close();
     songsOpener?.setAttribute('aria-expanded', 'false');
+    stopAutoRotate();
   }
 
   function stop() {
@@ -150,13 +298,14 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
     wantsPlayback = false;
     pending = false; error = '';
     audio.pause();
-    try { audio.currentTime = 0; } catch { /* Metadata may not have loaded yet. */ }
+    try { audio.currentTime = 0; } catch {}
     close(); sync();
   }
 
   function reset() {
     stop();
     if (selected !== TRACKS[0]) { selected = TRACKS[0]; audio.src = selected.src; }
+    currentIndex = 0;
     sync();
   }
 
@@ -178,22 +327,84 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
     returnFocus = null;
   }
 
+  prevBtn.addEventListener('click', () => { pauseAutoRotate(7000); stepCarousel(-1); });
+  nextBtn.addEventListener('click', () => { pauseAutoRotate(7000); stepCarousel(1); });
   closeButton.addEventListener('click', close);
   retry.addEventListener('click', play);
-  record.addEventListener('click', togglePlayback);
+
+  heroPlayBtn.addEventListener('click', () => {
+    pauseAutoRotate(7000);
+    const track = TRACKS[currentIndex];
+    if (track !== selected) {
+      selectTrack(track);
+    } else {
+      togglePlayback();
+    }
+  });
+
+  const viewport = dialog.querySelector('.sw-carousel-viewport');
+  let dragStartX = 0, dragging = false;
+  viewport.addEventListener('touchstart', e => {
+    pauseAutoRotate(8000);
+    dragStartX = e.touches[0].clientX;
+    dragging = true;
+  }, { passive: true });
+  viewport.addEventListener('touchend', e => {
+    if (!dragging) return;
+    dragging = false;
+    const deltaX = e.changedTouches[0].clientX - dragStartX;
+    if (Math.abs(deltaX) > 35) {
+      if (deltaX < 0) stepCarousel(1);
+      else stepCarousel(-1);
+    }
+  }, { passive: true });
+  viewport.addEventListener('mousedown', e => {
+    pauseAutoRotate(8000);
+    dragStartX = e.clientX;
+    dragging = true;
+  });
+  window.addEventListener('mouseup', e => {
+    if (!dragging || !dialog.open) return;
+    dragging = false;
+    const deltaX = e.clientX - dragStartX;
+    if (Math.abs(deltaX) > 35) {
+      if (deltaX < 0) stepCarousel(1);
+      else stepCarousel(-1);
+    }
+  });
+
+  dialog.addEventListener('pointerenter', () => pauseAutoRotate(6000));
+  dialog.addEventListener('pointerleave', () => pauseAutoRotate(2500));
+
   dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
   dialog.addEventListener('close', restoreFocus);
   dialog.addEventListener('keydown', event => {
-    if (event.key !== 'Tab') return;
-    const focusable = [...dialog.querySelectorAll('button:not([disabled])')].filter(button => !button.hidden);
-    const first = focusable[0], last = focusable[focusable.length - 1];
-    if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
-      event.preventDefault(); last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault(); first.focus();
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      pauseAutoRotate(7000);
+      stepCarousel(-1);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      pauseAutoRotate(7000);
+      stepCarousel(1);
+    } else if (event.key === ' ' || event.key === 'Enter') {
+      if (document.activeElement?.classList.contains('sw-record-item')) {
+        event.preventDefault();
+        pauseAutoRotate(7000);
+        selectTrack(TRACKS[currentIndex]);
+      }
+    } else if (event.key === 'Tab') {
+      const focusable = [...dialog.querySelectorAll('button:not([disabled])')].filter(button => !button.hidden);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
     }
   });
+
   const mediaEvents = ['play', 'playing', 'pause', 'ended', 'volumechange', 'emptied'];
   mediaEvents.forEach(event => audio.addEventListener(event, sync));
   audio.addEventListener('error', mediaError);
@@ -206,6 +417,7 @@ export function createSongWheel({ audio, onTrackChange = () => {}, onPlaybackCha
     get tracks() { return TRACKS; },
     destroy() {
       close(); restoreFocus();
+      stopAutoRotate();
       mediaEvents.forEach(event => audio.removeEventListener(event, sync));
       audio.removeEventListener('error', mediaError);
       dialog.remove();
