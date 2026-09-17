@@ -56,7 +56,7 @@ $('destination').addEventListener('click',confirm);
 const raycaster=new THREE.Raycaster();canvas.addEventListener('pointerup',event=>{if(phase!=='selected'&&phase!=='party')return;raycaster.setFromCamera(new THREE.Vector2(event.clientX/width*2-1,1-event.clientY/height*2),camera);if(phase==='party'){if(party.binReady&&raycaster.intersectObject(party.trashCan,true).length)shakeBin();return;}const targets=selected==='movie'?[home.doorPivot,home.entranceFrame]:[(selected==='gym'?silver:blue).group];if(raycaster.intersectObjects(targets,true).length)confirm();});
 function shakeBin(){if(phase==='party'&&party.shakeBin(globalTime)){$('bin-encore').hidden=true;$('bin-encore').disabled=true;$('party-announcement').textContent='';}}
 $('bin-encore').addEventListener('click',shakeBin);
-function reset(){party.stop();songWheel.stop();stopMovie();highway.stop();gymScene.stop();scene.add(blue.group,silver.group);selected=null;phase='idle';phaseStart=globalTime;activeCar=null;scene.add(dad.group);dad.group.visible=true;dad.group.scale.setScalar(1);dad.group.position.copy(baseDad);dad.group.rotation.set(0,0,0);dad.setOutfit('default');silver.group.position.copy(parked.silver);blue.group.position.copy(parked.blue);silver.group.rotation.y=blue.group.rotation.y=0;home.doorPivot.rotation.y=0;home.doorwayGlow.intensity=0;home.entranceFrame.material.emissiveIntensity=0;home.group.visible=true;silver.group.visible=blue.group.visible=true;scene.background=outdoorSky;scene.fog=new THREE.Fog('#c7e1dd',37,95);cinema.visible=false;sun.intensity=2.5;scene.environmentIntensity=.6;$('ending').hidden=true;$('curtain').classList.remove('closed');$('destination').hidden=true;$('hint').style.display='flex';$('hint-text').textContent='A whole day of your favorite things. Pick one.';$('chapter').textContent='HOME SWEET HOME';for(const el of document.querySelectorAll('.choice'))el.setAttribute('aria-pressed','false');setControls(true);resize();}
+function reset(){party.stop();songWheel.stop();stopMovie();highway.stop();gymScene.stop();$('drift-toast').hidden=true;highway.resetDrift?.();scene.add(blue.group,silver.group);selected=null;phase='idle';phaseStart=globalTime;activeCar=null;scene.add(dad.group);dad.group.visible=true;dad.group.scale.setScalar(1);dad.group.position.copy(baseDad);dad.group.rotation.set(0,0,0);dad.setOutfit('default');silver.group.position.copy(parked.silver);blue.group.position.copy(parked.blue);silver.group.rotation.y=blue.group.rotation.y=0;home.doorPivot.rotation.y=0;home.doorwayGlow.intensity=0;home.entranceFrame.material.emissiveIntensity=0;home.group.visible=true;silver.group.visible=blue.group.visible=true;scene.background=outdoorSky;scene.fog=new THREE.Fog('#c7e1dd',37,95);cinema.visible=false;sun.intensity=2.5;scene.environmentIntensity=.6;$('ending').hidden=true;$('curtain').classList.remove('closed');$('destination').hidden=true;$('hint').style.display='flex';$('hint-text').textContent='A whole day of your favorite things. Pick one.';$('chapter').textContent='HOME SWEET HOME';for(const el of document.querySelectorAll('.choice'))el.setAttribute('aria-pressed','false');setControls(true);resize();}
 $('reset').addEventListener('click',reset);$('home').addEventListener('click',reset);
 $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();}else{await $('app').requestFullscreen();if(screen.orientation?.lock)await screen.orientation.lock('landscape').catch(()=>{});}}catch{$('hint-text').textContent='For a bigger view, turn your phone sideways.';}});
 document.addEventListener('fullscreenchange',()=>{$('fullscreen').setAttribute('aria-label',document.fullscreenElement?'Exit full screen':'Full screen');resize();});
@@ -72,16 +72,113 @@ const party=await createParty({scene,home,dad,silver,blue,sun,portraitFill,reduc
 const music=$('party-music');music.volume=.45;
 const songWheel=createSongWheel({audio:music,onTrackChange:track=>{if(phase==='party')$('chapter').textContent=`${track.title.toUpperCase()} · BIRTHDAY EDITION`;}});
 const highway=createHighwayScene({car:blue,dad,reduced});scene.add(highway.group);
+let driftToastTimer=null;
+highway.onSpinComplete=()=>{
+  const toast=$('drift-toast');
+  if(!toast)return;
+  toast.hidden=false;
+  if(driftToastTimer)clearTimeout(driftToastTimer);
+  driftToastTimer=setTimeout(()=>{toast.hidden=true;},2200);
+};
+let isPointerDragging=false,dragStartX=0,lastPointerX=0,lastPointerTime=0;
+window.addEventListener('pointerdown',e=>{
+  if(phase!=='highway')return;
+  if(e.target.closest('button, nav, header, footer, #scene-controls'))return;
+  isPointerDragging=true;
+  dragStartX=lastPointerX=e.clientX;
+  lastPointerTime=performance.now();
+  requestOrientationPermission();
+});
+window.addEventListener('pointermove',e=>{
+  if(phase!=='highway'||!isPointerDragging)return;
+  const dx=e.clientX-dragStartX;
+  const dragRange=Math.max(120,Math.min(window.innerWidth*0.32,220));
+  const steerVal=THREE.MathUtils.clamp(dx/dragRange,-1,1);
+  const now=performance.now();
+  const dt=(now-lastPointerTime)/1000;
+  if(dt>0.012){
+    const vx=(e.clientX-lastPointerX)/dt;
+    if(Math.abs(vx)>1300&&Math.abs(steerVal)>0.82){
+      highway.trigger360(Math.sign(vx));
+    }
+  }
+  lastPointerX=e.clientX;
+  lastPointerTime=now;
+  highway.steer(steerVal);
+});
+function endPointerDrag(){
+  if(phase!=='highway'||!isPointerDragging)return;
+  isPointerDragging=false;
+  highway.steer(0);
+}
+window.addEventListener('pointerup',endPointerDrag);
+window.addEventListener('pointercancel',endPointerDrag);
+window.addEventListener('keydown',e=>{
+  if(phase!=='highway')return;
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){
+    highway.steer(-1);
+  }else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){
+    highway.steer(1);
+  }else if(e.key===' '||e.key==='Spacebar'){
+    highway.trigger360();
+  }
+});
+window.addEventListener('keyup',e=>{
+  if(phase!=='highway')return;
+  if(['ArrowLeft','ArrowRight','a','A','d','D'].includes(e.key)){
+    highway.steer(0);
+  }
+});
+let orientationPermissionRequested=false;
+function requestOrientationPermission(){
+  if(orientationPermissionRequested)return;
+  orientationPermissionRequested=true;
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().catch(()=>{});
+  }
+}
+let lastTilt=0,lastTiltTime=0;
+window.addEventListener('deviceorientation',e=>{
+  if(phase!=='highway'||isPointerDragging)return;
+  const isLandscape=window.innerWidth>window.innerHeight;
+  let tilt=0;
+  if(isLandscape){
+    const angle=screen.orientation?.angle??(window.orientation||0);
+    tilt=angle===90?(e.beta||0):-(e.beta||0);
+  }else{
+    tilt=e.gamma||0;
+  }
+  const deadzone=3.5,maxTilt=25.0;
+  let steerVal=0;
+  if(Math.abs(tilt)>deadzone){
+    const sign=Math.sign(tilt);
+    const mag=(Math.abs(tilt)-deadzone)/(maxTilt-deadzone);
+    steerVal=sign*THREE.MathUtils.clamp(mag,0,1);
+  }else{
+    steerVal=0;
+  }
+  const now=performance.now();
+  const dt=(now-lastTiltTime)/1000;
+  if(dt>0.02&&dt<0.3){
+    const rate=Math.abs(tilt-lastTilt)/dt;
+    if(rate>85&&Math.abs(tilt)>20){
+      highway.trigger360(Math.sign(tilt));
+    }
+  }
+  lastTilt=tilt;
+  lastTiltTime=now;
+  highway.steer(steerVal);
+},{passive:true});
 const gymScene=createGymScene({dad,reduced});scene.add(gymScene.group);
 function showGym(){scene.add(dad.group);home.group.visible=false;silver.group.visible=blue.group.visible=false;cinema.visible=false;gymScene.start();scene.background=new THREE.Color('#203346');scene.fog=null;sun.intensity=.15;scene.environmentIntensity=.3;camera.position.copy(gymScene.cameraPosition);camera.lookAt(gymScene.cameraTarget);$('hint').style.display='none';$('chapter').textContent='HIT THE GYM';}
-function showHighway(){home.group.visible=false;silver.group.visible=false;cinema.visible=false;highway.start();scene.background=highway.backgroundColor;scene.fog=null;sun.intensity=2.5;scene.environmentIntensity=.6;camera.position.copy(highway.cameraPosition);camera.lookAt(highway.cameraTarget);$('hint').style.display='none';$('chapter').textContent='TAKE A DRIVE';}
+function showHighway(){home.group.visible=false;silver.group.visible=false;cinema.visible=false;highway.start();scene.background=highway.backgroundColor;scene.fog=null;sun.intensity=2.5;scene.environmentIntensity=.6;camera.position.copy(highway.cameraPosition);camera.lookAt(highway.cameraTarget);$('hint').style.display='flex';const isTouch='ontouchstart' in window||navigator.maxTouchPoints>0;$('hint-text').textContent=isTouch?'Tilt phone or drag left / right to drift · Hard flick for 360!':'Drag mouse or use A/D keys to drift · Hard flick for 360!';$('chapter').textContent='TAKE A DRIVE';}
 function playMusic(){return songWheel.play();}
 function celebrate(){if(visited.size<3)return;reset();selected='celebrate';phase='party';phaseStart=globalTime;party.start(globalTime);setControls(false);$('destination').hidden=true;$('hint').style.display='none';$('unlock-toast').hidden=true;$('party-controls').hidden=false;$('chapter').textContent=`${songWheel.selectedTrack.title.toUpperCase()} · BIRTHDAY EDITION`;playMusic();}
 $('party-home').addEventListener('click',reset);
 $('party-songs').addEventListener('click',event=>songWheel.open(event.currentTarget));
 $('party-mute').addEventListener('click',()=>{if(music.paused){music.muted=false;playMusic();}else songWheel.toggleMute();});
 function showCinema(){home.group.visible=false;silver.group.visible=blue.group.visible=false;cinema.visible=true;scene.background=new THREE.Color('#263947');scene.fog=null;sun.intensity=.5;scene.environmentIntensity=.2;dad.group.visible=true;dad.group.position.copy(cinemaData.dadPosition);dad.group.rotation.y=Math.PI;cinemaData.start();movieVideo.pause();movieVideo.currentTime=0;movieStarted=false;camera.position.copy(cinemaData.cameraPosition);camera.lookAt(cinemaData.cameraTarget);camera.updateMatrixWorld();$('hint').style.display='none';$('chapter').textContent='MOVIE NIGHT';$('movie-mute').hidden=false;}
-function finish(){phase='ending';endingAt=globalTime;$('ending').hidden=false;$('hint').style.display='none';$('end-kicker').textContent='HAPPY BIRTHDAY, DAD';$('end-title').textContent=selected==='movie'?'Movie night.':selected==='gym'?'Workout complete.':'Nice drive.';$('end-copy').textContent='What’s next?';$('home').focus({preventScroll:true});}
+function finish(){phase='ending';endingAt=globalTime;$('ending').hidden=false;$('hint').style.display='none';$('drift-toast').hidden=true;$('end-kicker').textContent='HAPPY BIRTHDAY, DAD';$('end-title').textContent=selected==='movie'?'Movie night.':selected==='gym'?'Workout complete.':'Nice drive.';$('end-copy').textContent='What’s next?';$('home').focus({preventScroll:true});}
 function walkingPath(t,car){const from=baseDad;const step=new THREE.Vector3(-1.05,.1,4.25),corner=new THREE.Vector3(car.group.position.x-1.25,.1,4.25),end=new THREE.Vector3(car.group.position.x-1.25,.1,5.8);const points=[from,step,corner,end];const lengths=[from.distanceTo(step),step.distanceTo(corner),corner.distanceTo(end)];let d=clamp(t,0,1)*lengths.reduce((a,b)=>a+b,0);for(let i=0;i<3;i++){if(d<=lengths[i]||i===2){dad.group.position.lerpVectors(points[i],points[i+1],clamp(d/lengths[i],0,1));const delta=points[i+1].clone().sub(points[i]);dad.group.rotation.y=Math.atan2(delta.x,delta.z);return;}d-=lengths[i];}}
 function tick(){globalTime=(performance.now()-start)/1000;const frameDelta=Math.min(1,Math.max(0,globalTime-lastFrameTime));lastFrameTime=globalTime;let elapsed=globalTime-phaseStart,pose='idle',animationTime=globalTime;
  if(phase==='intro'){if(globalTime<1.5){home.doorPivot.rotation.y=-smooth(globalTime/.7)*1.5;dad.group.position.z=1.94+smooth(globalTime/1.5)*.96;pose='walk';}else if(globalTime<5){dad.group.position.copy(baseDad);pose='wave';home.doorPivot.rotation.y=-1.5*(1-smooth((globalTime-2)/1));}else{dad.group.position.copy(baseDad);phase='idle';phaseStart=globalTime;}}

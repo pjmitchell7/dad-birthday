@@ -11,7 +11,7 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
   const group = new THREE.Group(); group.name = 'Sunny highway drive'; group.visible = false;
   const cameraPosition = new THREE.Vector3(.32, 10.25, 4.8);
   const cameraTarget = new THREE.Vector3(0, .4, -.05);
-  const duration = 14, span = 128, cruise = 17, ramp = 2.2;
+  const duration = 35, span = 128, cruise = 17, ramp = 2.2;
   let active = false, savedCar = null, savedDad = null, savedWheels = [], animationTime = 0;
   let seed = 981;
   const random = () => { seed = Math.imul(1664525, seed) + 1013904223 | 0; return (seed >>> 0) / 4294967296; };
@@ -26,6 +26,8 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
     leaves: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }),
     post: new THREE.MeshStandardMaterial({ color: 0xe6e5d6, roughness: .8 }),
     reflector: new THREE.MeshStandardMaterial({ color: 0xfaa365, emissive: 0xc96224, emissiveIntensity: .15, roughness: .5 }),
+    skid: new THREE.MeshBasicMaterial({ color: 0x1a1c1e, transparent: true, opacity: .58, depthWrite: false }),
+    smoke: new THREE.MeshBasicMaterial({ color: 0xdde4ea, transparent: true, opacity: .36, depthWrite: false }),
   };
   function add(geometry, material) {
     const object = new THREE.Mesh(geometry, material); object.receiveShadow = true; group.add(object); return object;
@@ -75,6 +77,73 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
     }
   }
   crowns.instanceColor.needsUpdate = true;
+  // Dynamic tire skid mark system along asphalt
+  const skidCount = 64;
+  const skids = instances(new THREE.BoxGeometry(.22, .004, .76), materials.skid, skidCount, 'Tire skid marks');
+  const skidData = Array.from({ length: skidCount }, () => ({ active: false, x: 0, roadDist: 0, initialZ: 0, yaw: 0 }));
+  let skidHead = 0, lastSkidDist = 0;
+
+  function recordSkid(xOffset) {
+    const rec = skidData[skidHead];
+    skidHead = (skidHead + 1) % skidCount;
+    rec.active = true;
+    rec.x = car.group.position.x + Math.cos(yawAngle) * xOffset;
+    rec.roadDist = currentRoadDistance;
+    rec.initialZ = -1.46 + Math.sin(yawAngle) * xOffset;
+    rec.yaw = yawAngle;
+  }
+
+  function updateSkids(distance) {
+    for (let i = 0; i < skidCount; i++) {
+      const rec = skidData[i];
+      if (!rec.active) {
+        place(skids, i, 0, -10, 0, 0, 0, 0);
+        continue;
+      }
+      const ageDist = distance - rec.roadDist;
+      if (ageDist > 28 || ageDist < -1) {
+        rec.active = false;
+        place(skids, i, 0, -10, 0, 0, 0, 0);
+      } else {
+        const z = rec.initialZ - ageDist;
+        const scale = THREE.MathUtils.clamp(1 - ageDist / 28, 0, 1);
+        place(skids, i, rec.x, .058, z, scale, 1, 1, rec.yaw);
+      }
+    }
+    skids.instanceMatrix.needsUpdate = true;
+  }
+
+  // Tire smoke particle pool
+  const smokeCount = 20;
+  const smokeGroup = new THREE.Group(); smokeGroup.name = 'Tire drift smoke'; group.add(smokeGroup);
+  const smokeGeo = new THREE.SphereGeometry(.2, 7, 5);
+  const smokeParticles = [];
+  for (let i = 0; i < smokeCount; i++) {
+    const mesh = new THREE.Mesh(smokeGeo, materials.smoke.clone());
+    mesh.visible = false;
+    smokeGroup.add(mesh);
+    smokeParticles.push({ mesh, active: false, life: 0, maxLife: .65, maxScale: 1.6, vx: 0, vy: 0, vz: 0 });
+  }
+
+  function emitSmoke(sideOffset) {
+    const p = smokeParticles.find(item => !item.active) || smokeParticles[skidHead % smokeCount];
+    p.active = true;
+    p.life = 0;
+    p.maxLife = .42 + random() * .32;
+    p.maxScale = 1.3 + random() * .7;
+    p.mesh.position.set(
+      car.group.position.x + sideOffset * .88 + (random() - .5) * .2,
+      .13,
+      -1.46 + (random() - .5) * .3
+    );
+    p.vx = (random() - .5) * .7 - steer * .35;
+    p.vy = .35 + random() * .4;
+    p.vz = -cruise * .26 + (random() - .5) * 1.5;
+    p.mesh.scale.setScalar(.32);
+    p.mesh.material.opacity = .35;
+    p.mesh.visible = true;
+  }
+
   const roadside = [marks, railPosts, guidePosts, reflectors, trunks, crowns];
   function wrap(z, distance) { return ((z - distance + span / 2) % span + span) % span - span / 2; }
   function moveRoad(distance) {
@@ -94,6 +163,7 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
     });
     roadside.forEach(object => { object.instanceMatrix.needsUpdate = true; });
     asphaltMap.offset.y = -distance / span * asphaltMap.repeat.y;
+    updateSkids(distance);
   }
   moveRoad(0);
 
@@ -124,6 +194,33 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
   }
   flames.visible = false;
 
+  // Drift, steering and 360 spin state
+  let targetSteer = 0;
+  let steer = 0;
+  let lateralX = 0;
+  let yawAngle = 0;
+  let rollAngle = 0;
+  let lastT = 0;
+  let currentRoadDistance = 0;
+  let hardDriftTime = 0;
+  let lastSteerInput = 0;
+  let spinState = 'idle';
+  let spinProgress = 0;
+  let spinDirection = 1;
+  const spinDuration = 1.15;
+  let spinCooldown = 0;
+  let onSpinComplete = null;
+  let onSpinStart = null;
+
+  function trigger360(dir) {
+    if (spinState === 'spinning') return;
+    spinState = 'spinning';
+    spinProgress = 0;
+    spinDirection = dir !== undefined ? Math.sign(dir) || 1 : (targetSteer >= 0 ? 1 : -1);
+    hardDriftTime = 0;
+    onSpinStart?.();
+  }
+
   function snapshot(object) {
     return { parent: object.parent, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.clone(), visible: object.visible };
   }
@@ -135,42 +232,162 @@ export function createHighwayScene({ car, dad, reduced = false } = {}) {
     if (active) stop();
     savedCar = snapshot(car.group); savedDad = snapshot(dad.group);
     savedWheels = (car.wheels || []).map(wheel => [wheel, wheel.quaternion.clone()]);
+    for (const wheel of (car.wheels || [])) wheel.rotation.order = 'YXZ';
     group.add(car.group); car.group.position.set(0, .061, 0); car.group.rotation.set(0, 0, 0); car.group.scale.setScalar(1); car.group.visible = true;
     car.group.add(dad.group); dad.group.scale.setScalar(.66); dad.group.rotation.set(0, 0, 0); dad.group.visible = true;
     const seat = car.group.userData.driverPosition?.clone() || new THREE.Vector3(-.4, .776, -.28);
     const offset = dad.group.userData.drivingHipOffset;
     const hips = offset?.isVector3 ? offset.clone() : new THREE.Vector3(...(offset || [0, 1.307146, -.004381]));
     dad.group.position.copy(seat).sub(hips.multiplyScalar(.66));
+    targetSteer = 0; steer = 0; lateralX = 0; yawAngle = 0; rollAngle = 0; lastT = 0;
+    hardDriftTime = 0; lastSteerInput = 0; spinState = 'idle'; spinProgress = 0; spinCooldown = 0;
+    for (const p of smokeParticles) { p.active = false; p.mesh.visible = false; }
+    for (const s of skidData) { s.active = false; }
+    updateSkids(0);
     active = true; group.visible = true; update(0);
   }
+
   function update(elapsed = 0) {
     if (!active) return;
     const t = THREE.MathUtils.clamp(elapsed, 0, duration), u = Math.min(1, t / ramp);
+    const dt = Math.min(.1, Math.max(.001, t - lastT));
+    lastT = t;
     const distance = reduced ? 0 : cruise * (t < ramp ? ramp * (u ** 3 - .5 * u ** 4) : t - ramp / 2);
+    currentRoadDistance = distance;
     animationTime = reduced ? 0 : t;
-    moveRoad(distance);
-    car.group.position.x = reduced ? 0 : Math.sin(t * .55) * .085;
-    car.group.position.y = .061 + (reduced ? 0 : Math.sin(t * 4.8) * .003);
-    car.group.rotation.z = reduced ? 0 : Math.sin(t * .55) * -.004;
-    car.animate?.(reduced ? 0 : 1, distance);
-    flames.position.copy(car.group.position); flames.quaternion.copy(car.group.quaternion);
+    if (spinCooldown > 0) spinCooldown = Math.max(0, spinCooldown - dt);
+
+    // 360 Spin trigger detection (requires hard, decisive action: fast violent flick OR sustained hard drift)
+    if (!reduced && spinState === 'idle' && spinCooldown <= 0 && t > ramp * .6) {
+      if (Math.abs(targetSteer) >= .92) {
+        hardDriftTime += dt;
+        if (hardDriftTime >= .95) trigger360(targetSteer >= 0 ? 1 : -1);
+      } else {
+        hardDriftTime = Math.max(0, hardDriftTime - dt * 2.5);
+      }
+      const steerDelta = Math.abs(targetSteer - lastSteerInput);
+      const steerRate = steerDelta / dt;
+      if (steerRate > 6.0 && Math.abs(targetSteer) >= .92) {
+        trigger360(targetSteer >= 0 ? 1 : -1);
+      }
+      lastSteerInput = targetSteer;
+    }
+
     let pulse = 0;
-    if (!reduced) for (const when of [3.10, 6.65, 10.10, 12.35]) {
+    if (spinState === 'spinning') {
+      spinProgress += dt / spinDuration;
+      const prog = THREE.MathUtils.clamp(spinProgress, 0, 1);
+      const eased = prog * prog * (3 - 2 * prog);
+      const spinAngle = (spinDirection >= 0 ? -1 : 1) * Math.PI * 2 * eased;
+      yawAngle = spinAngle;
+      lateralX = THREE.MathUtils.clamp(lateralX + Math.sin(eased * Math.PI) * spinDirection * dt * 1.6, -3.3, 3.3);
+      if (prog >= .22 && prog <= .85) pulse = Math.max(pulse, .98);
+      if (prog >= 1) {
+        spinState = 'idle';
+        spinProgress = 0;
+        spinCooldown = 2.0;
+        yawAngle = 0;
+        onSpinComplete?.();
+      }
+    } else {
+      steer = THREE.MathUtils.damp(steer, targetSteer, 7.5, dt);
+      if (targetSteer === 0) {
+        lateralX = THREE.MathUtils.damp(lateralX, 0, 4.5, dt);
+        yawAngle = THREE.MathUtils.damp(yawAngle, 0, 7.0, dt);
+        rollAngle = THREE.MathUtils.damp(rollAngle, 0, 8.0, dt);
+      } else {
+        const targetX = steer * 3.3;
+        lateralX = THREE.MathUtils.damp(lateralX, targetX, 5.0, dt);
+        const targetYaw = steer * .42;
+        yawAngle = THREE.MathUtils.damp(yawAngle, targetYaw, 6.5, dt);
+        rollAngle = THREE.MathUtils.damp(rollAngle, -steer * .05, 6.0, dt);
+      }
+    }
+
+    // Front wheel countersteering
+    if (car.wheels && car.wheels.length >= 4) {
+      const counterAngle = spinState === 'spinning' ? -spinDirection * .45 : -steer * .38;
+      car.wheels[0].rotation.y = counterAngle;
+      car.wheels[2].rotation.y = counterAngle;
+    }
+
+    moveRoad(distance);
+
+    car.group.position.x = (reduced ? 0 : Math.sin(t * .55) * .085) + (reduced ? 0 : lateralX);
+    car.group.position.y = .061 + (reduced ? 0 : Math.sin(t * 4.8) * .003);
+    car.group.rotation.y = reduced ? 0 : yawAngle;
+    car.group.rotation.z = (reduced ? 0 : Math.sin(t * .55) * -.004) + (reduced ? 0 : rollAngle);
+    car.animate?.(reduced ? 0 : 1, distance);
+
+    // Dynamic skid marks & tire smoke
+    const isDriftingHard = Math.abs(steer) > .32 || spinState === 'spinning';
+    if (!reduced && isDriftingHard && t > ramp * .6) {
+      if (Math.abs(distance - lastSkidDist) > .52) {
+        recordSkid(-.91);
+        recordSkid(.91);
+        lastSkidDist = distance;
+      }
+      emitSmoke(-1);
+      emitSmoke(1);
+    }
+
+    // Update active smoke puffs
+    for (const p of smokeParticles) {
+      if (!p.active) continue;
+      p.life += dt;
+      if (p.life >= p.maxLife) {
+        p.active = false;
+        p.mesh.visible = false;
+        continue;
+      }
+      const frac = p.life / p.maxLife;
+      p.mesh.position.x += p.vx * dt;
+      p.mesh.position.y += p.vy * dt;
+      p.mesh.position.z += p.vz * dt;
+      p.mesh.scale.setScalar(.32 + frac * (p.maxScale - .32));
+      p.mesh.material.opacity = (1 - frac) * .36;
+    }
+
+    flames.position.copy(car.group.position); flames.quaternion.copy(car.group.quaternion);
+    if (!reduced) for (const when of [3.10, 7.5, 12.2, 17.8, 23.4, 29.1]) {
       const age = t - when; if (age >= 0 && age < .34) pulse = Math.max(pulse, Math.sin(age / .34 * Math.PI));
     }
     flames.visible = pulse > .035;
     outlets.forEach((outlet, i) => { outlet.scale.set(.64 + pulse * .36, .64 + pulse * .36, pulse * (.86 + .14 * Math.sin(t * 70 + i))); });
     cameraPosition.set(.32 + (reduced ? 0 : Math.sin(t * .28) * .06), 10.25, 4.8);
   }
+
   function stop() {
     if (!active) { group.visible = false; return; }
     // Restore Dad first even if his saved parent was the car itself.
     restore(dad.group, savedDad); restore(car.group, savedCar);
-    savedWheels.forEach(([wheel, quaternion]) => wheel.quaternion.copy(quaternion));
+    savedWheels.forEach(([wheel, quaternion]) => {
+      wheel.quaternion.copy(quaternion);
+      wheel.rotation.order = 'XYZ';
+    });
+    for (const p of smokeParticles) { p.active = false; p.mesh.visible = false; }
+    for (const s of skidData) { s.active = false; }
+    updateSkids(0);
     active = false; group.visible = false; flames.visible = false; animationTime = 0;
   }
+
   return {
     group, cameraPosition, cameraTarget, duration, start, update, stop,
+    steer(amount) {
+      if (amount !== undefined) targetSteer = THREE.MathUtils.clamp(amount, -1, 1);
+      return steer;
+    },
+    trigger360,
+    resetDrift() { targetSteer = 0; steer = 0; lateralX = 0; yawAngle = 0; rollAngle = 0; spinState = 'idle'; spinProgress = 0; },
+    get currentSteer() { return steer; },
+    get isDrifting() { return Math.abs(steer) > .25; },
+    get isSpinning() { return spinState === 'spinning'; },
+    get lateralX() { return lateralX; },
+    get yawAngle() { return yawAngle; },
+    get onSpinComplete() { return onSpinComplete; },
+    set onSpinComplete(fn) { onSpinComplete = fn; },
+    get onSpinStart() { return onSpinStart; },
+    set onSpinStart(fn) { onSpinStart = fn; },
     pose: 'driving', get animationTime() { return animationTime; },
     get active() { return active; },
     backgroundColor: new THREE.Color('#b9dce9'), fogColor: new THREE.Color('#c5dde2'),
