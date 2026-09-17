@@ -1,12 +1,13 @@
 <!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#b8dcec"><meta name="description" content="A little birthday adventure, made with love for Dad.">
   <title>Dad's Day · Happy Birthday</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%23f4c64e'/%3E%3Ctext x='24' y='34' text-anchor='middle' font-size='34'%3ED%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./song-wheel.css">
+  <link rel="stylesheet" href="./style.css?v=11">
+  <link rel="stylesheet" href="./song-wheel.css?v=11">
   <script type="importmap">{"imports":{"three":"./assets/three.module.js","three/addons/utils/BufferGeometryUtils.js":"./assets/BufferGeometryUtils.js","three/addons/":"./assets/three-addons/"}}</script>
 </head>
 <body>
@@ -17,7 +18,7 @@
       <button class="choice" id="movie" data-mode="movie" aria-pressed="false"><span class="choice-icon"><img src="./assets/icons/film-slate-duotone.svg" alt="" width="38" height="38"></span><span>Movie night</span><span class="choice-dot"></span></button>
       <button class="choice" id="gym" data-mode="gym" aria-pressed="false"><span class="choice-icon"><img src="./assets/icons/barbell-duotone.svg" alt="" width="38" height="38"></span><span>Hit the gym</span><span class="choice-dot"></span></button>
       <button class="choice" id="drive" data-mode="drive" aria-pressed="false"><span class="choice-icon"><img src="./assets/icons/steering-wheel-duotone.svg" alt="" width="38" height="38"></span><span>Take a drive</span><span class="choice-dot"></span></button>
-      <button class="choice locked" id="celebrate" data-mode="celebrate" aria-pressed="false" aria-label="Celebrate" disabled hidden><span class="choice-icon"><img src="./assets/icons/celebrate.svg" alt="" width="38" height="38"></span><span>Celebrate <small id="celebrate-progress"></small></span></button>
+      <button class="choice locked" id="celebrate" data-mode="celebrate" aria-pressed="false" aria-label="Celebrate" style="display: none !important;" disabled hidden><span class="choice-icon"><img src="./assets/icons/celebrate.svg" alt="" width="38" height="38"></span><span>Celebrate <small id="celebrate-progress"></small></span></button>
     </nav>
     <button id="destination" hidden><span id="destination-label">Come on in</span><span class="target-ring"></span></button>
     <div id="unlock-toast" hidden role="status">One more surprise… Celebrate is unlocked!</div>
@@ -36,6 +37,6 @@
     <section id="ending" hidden aria-labelledby="end-title"><div class="end-card"><span class="eyebrow" id="end-kicker">THE BEST PART</span><h2 id="end-title">Time together.</h2><p id="end-copy">The best days are the ones we spend together.<br>Happy birthday, Dad.</p><button id="home">Back to the house <span>↗</span></button></div></section>
     <section id="error" hidden><h2>Your birthday adventure needs 3D graphics.</h2><p>Try opening this page in a recent version of Safari, Chrome, or Edge.</p><button onclick="location.reload()">Try again</button></section>
   </main>
-  <script type="module" src="./main.js?v=6"></script>
+  <script type="module" src="./main.js?v=11"></script>
 </body>
 </html>
