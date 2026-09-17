@@ -191,8 +191,10 @@ export async function createDad(options = {}) {
     const wrist=boneMap['wrist.'+side],sourceForward=new THREE.Vector3(...rest['finger3-1.'+side].head).sub(new THREE.Vector3(...rest['wrist.'+side].head)).normalize();
     const sourceRight=new THREE.Vector3(...rest['finger5-1.'+side].head).sub(new THREE.Vector3(...rest['finger2-1.'+side].head));sourceRight.addScaledVector(sourceForward,-sourceRight.dot(sourceForward)).normalize();
     const sourceNormal=new THREE.Vector3().crossVectors(sourceRight,sourceForward).normalize();
-    const f=new THREE.Vector3(...forward).normalize(),n=new THREE.Vector3(...normal).normalize(),r=new THREE.Vector3().crossVectors(f,n).normalize();n.crossVectors(r,f).normalize();
-    const source=new THREE.Matrix4().makeBasis(sourceRight,sourceForward,sourceNormal),target=new THREE.Matrix4().makeBasis(r,f,n);
+    const f=new THREE.Vector3(...forward).normalize(),n=new THREE.Vector3(...normal).normalize();
+    const targetNormal=n.clone().multiplyScalar(side==='L'?-1:1).normalize();
+    const targetRight=new THREE.Vector3().crossVectors(f,targetNormal).normalize();
+    const source=new THREE.Matrix4().makeBasis(sourceRight,sourceForward,sourceNormal),target=new THREE.Matrix4().makeBasis(targetRight,f,targetNormal);
     const rotation=new THREE.Quaternion().setFromRotationMatrix(target.multiply(source.invert()));
     rotation.premultiply(model.getWorldQuaternion(new THREE.Quaternion()));worldOrientation(wrist,rotation);
   }
@@ -211,15 +213,17 @@ export async function createDad(options = {}) {
     model.updateWorldMatrix(true,true);
     for(const side of ['L','R']){
       const sign=side==='L'?1:-1;
-      const ankle=[mix(sign*.25,sign*.19,floorWeight),mix(.1116,.242,floorWeight),mix(.0179,-1.23,floorWeight)];
+      const ankle=[mix(sign*.25,sign*.19,floorWeight),mix(.1116,.118,floorWeight),mix(.0179,-1.38,floorWeight)];
       if(flip){ankle[1]+=tuck*.70;ankle[2]+=tuck*.45;}
-      solveLimb('upperleg01.'+side,'lowerleg01.'+side,'foot.'+side,ankle,[sign*.28,.56,mix(.58,-.50,floorWeight)+tuck*.3]);
+      const legPole=[sign*.28,mix(.56,-.15,floorWeight),mix(.58,-.75,floorWeight)+tuck*.3];
+      solveLimb('upperleg01.'+side,'lowerleg01.'+side,'foot.'+side,ankle,legPole);
       const footQ=model.getWorldQuaternion(new THREE.Quaternion());if(floorWeight>0)footQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),floorWeight*.65));worldOrientation(boneMap['foot.'+side],footQ);
     }
     let barHeight=mix(.352,1.23,lift);barHeight=mix(barHeight,1.83,clean);barHeight=mix(barHeight,2.61,press);
     const catchLift=eased(t,25.8,26.75),absorb=eased(t,26.75,27.55);if(t>=25.8)barHeight=mix(mix(1.83,2.61,catchLift),1.83,absorb);
     const held=t>=2.2&&t<6.2||t>=26.75;
     const release=eased(t,6.2,7),catchReady=eased(t,25.25,25.8);
+    const overhead=Math.max(press*(1-release),catchLift),inClean=clean*(1-press);
     for(const side of ['L','R']){
       const sign=side==='L'?1:-1;
       let wrist=[sign*.32,mix(1.23,barHeight,toGrip),mix(.09,.38,toGrip)];
@@ -229,9 +233,19 @@ export async function createDad(options = {}) {
       wrist=wrist.map((v,i)=>mix(v,[sign*.335,.088,.49][i],floorWeight));
       if(flip)wrist=wrist.map((v,i)=>mix(v,[sign*.24,1.29,.29][i],tuck));
       if(side==='L')wrist=wrist.map((v,i)=>mix(v,[.05,1.68,.41][i],watch));
-      const pole=[sign*mix(.65,.61,floorWeight),mix(1.50,.42,floorWeight),mix(.57,.32,floorWeight)];
+      let poleY=mix(1.50,.28,floorWeight),poleZ=mix(-.22,.12,floorWeight);
+      if(inClean>0){poleY=mix(poleY,1.75,inClean);poleZ=mix(poleZ,.35,inClean);}
+      if(overhead>0){poleY=mix(poleY,2.15,overhead);poleZ=mix(poleZ,.15,overhead);}
+      const pole=[sign*mix(.65,.65,floorWeight),poleY,poleZ];
       solveLimb('upperarm01.'+side,'lowerarm01.'+side,'wrist.'+side,wrist,pole);
-      orientWorkoutHand(side,[0,0,1],shrug>.5?[0,-1,0]:[0,1,0]);
+      let handF=[0,-.92,.38],handN=[sign*.92,0,.38];
+      const activeGrip=Math.max(toGrip*(1-release),catchReady);
+      if(activeGrip>0){handF=handF.map((v,i)=>mix(v,[0,0,1][i],activeGrip));handN=handN.map((v,i)=>mix(v,[0,1,0][i],activeGrip));}
+      if(overhead>0){handF=handF.map((v,i)=>mix(v,[0,1,0][i],overhead));handN=handN.map((v,i)=>mix(v,[0,0,-1][i],overhead));}
+      if(floorWeight>0){handF=handF.map((v,i)=>mix(v,[0,0,1][i],floorWeight));handN=handN.map((v,i)=>mix(v,[0,1,0][i],floorWeight));}
+      if(shrug>0){handF=handF.map((v,i)=>mix(v,[0,.25,.96][i],shrug));handN=handN.map((v,i)=>mix(v,[0,-1,0][i],shrug));}
+      if(side==='L'&&watch>0){handF=handF.map((v,i)=>mix(v,[-.3,.7,.6][i],watch));handN=handN.map((v,i)=>mix(v,[.5,.6,-.6][i],watch));}
+      orientWorkoutHand(side,handF,handN);
       const curl=(1-floorWeight)*(held||toGrip>.8&&t<6.2||t>=25.8?.66:shrug>.2?.12:0);
       for(let finger=2;finger<=5;finger++)for(let segment=2;segment<=3;segment++)boneMap[`finger${finger}-${segment}.${side}`].quaternion.setFromAxisAngle(new THREE.Vector3(side==='L'?.38:-.38,-.44,-.81).normalize(),side==='L'?-curl:curl);
     }
