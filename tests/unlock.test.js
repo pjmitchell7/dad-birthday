@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 function createUnlockTracker(initialActivities = []) {
@@ -93,4 +93,37 @@ test('Duplicate completions do not falsely increment or re-trigger unlock', () =
   assert.equal(tracker.visited.size, 1);
   tracker.recordCompletion('movie');
   assert.equal(tracker.visited.size, 1);
+});
+
+test('Entering activity and immediately clicking back to house counts as completion without full play-through', () => {
+  const tracker = createUnlockTracker();
+  const el = {};
+
+  // 1. Enter movie and immediately return home
+  tracker.recordCompletion('movie', 'enter', 5);
+  tracker.returnHome(6);
+  tracker.syncUnlock(el);
+  assert.equal(tracker.visited.has('movie'), true);
+  assert.equal(tracker.visited.size, 1);
+  assert.equal(el.hidden, true); // Still locked
+
+  // 2. Enter gym and immediately return home
+  tracker.recordCompletion('gym', 'walk', 12);
+  tracker.returnHome(13);
+  tracker.syncUnlock(el);
+  assert.equal(tracker.visited.has('gym'), true);
+  assert.equal(tracker.visited.size, 2);
+  assert.equal(el.hidden, true); // Still locked
+
+  // 3. Enter drive and immediately return home
+  tracker.recordCompletion('drive', 'driving', 20);
+  assert.equal(tracker.pendingToast, true);
+  tracker.returnHome(21);
+  tracker.syncUnlock(el);
+  assert.equal(tracker.visited.has('drive'), true);
+  assert.equal(tracker.visited.size, 3);
+  assert.equal(el.hidden, false); // UNLOCKED!
+  assert.equal(el.unlocked, true);
+  assert.equal(tracker.pendingToast, false);
+  assert.equal(tracker.unlockedAt, 21);
 });
