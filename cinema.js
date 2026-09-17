@@ -153,5 +153,5 @@ export function createCinema({video}={}) {
   function update(time,aspect=16/9){const on=Math.max(0,Math.min(1,(time-.65)/.45));screen.visible=on>0;screen.scale.y=Math.max(.001,on);screenGlow.intensity=on*(8+Math.sin(time*1.7)*1.2);powerLed.material.color.set(on>0?0x77bbff:0xff415a);const zoom=Math.max(0,Math.min(1,(time-4)/3));const q=zoom*zoom*(3-2*zoom);cameraPosition.lerpVectors(new THREE.Vector3(10,7,.6),new THREE.Vector3(4.4,5.3,7.7),q);cameraTarget.lerpVectors(new THREE.Vector3(-.8,1.95,-.8),new THREE.Vector3(-.35,3.96,-5.48),q);if(aspect<1.2)cameraPosition.addScaledVector(cameraPosition.clone().sub(cameraTarget).normalize(),(1.2/aspect-1)*8);}
   function start(){screen.visible=false;screenGlow.intensity=0;powerLed.material.color.set(0xff415a);update(0);}
   function stop(){screen.visible=false;screenGlow.intensity=0;}
-  return {group,screen,sofa,screenGlow,start,stop,update,dadPosition:new THREE.Vector3(-.70,.99-1.307146,3.25),cameraPosition,cameraTarget};
+  return {group,screen,sofa,screenGlow,start,stop,update,dadPosition:new THREE.Vector3(-.70,.99-1.307146,2.98),cameraPosition,cameraTarget};
 }
