@@ -22,7 +22,7 @@
     <button id="destination" hidden><span id="destination-label">Come on in</span><span class="target-ring"></span></button>
     <div id="unlock-toast" hidden role="status">One more surprise… Celebrate is unlocked!</div>
     <div id="drift-toast" hidden role="status">360° DRIFT! ★★★</div>
-    <div id="party-controls" hidden><button id="party-songs" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M7 9a6 6 0 0 1 3-3m4 12a6 6 0 0 0 3-3"/></svg> Songs</button><button id="party-mute" aria-label="Mute music">Sound on</button><button id="party-home">Back to the house</button></div>
+    <div id="party-controls" hidden><button id="party-songs" class="sw-vinyl-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose disco music (vinyl player)"><span class="sw-vinyl-disc" aria-hidden="true"><span class="sw-vinyl-grooves"></span><span class="sw-vinyl-sheen"></span><span class="sw-vinyl-center"><span class="sw-vinyl-hole"></span><span class="sw-vinyl-text">SONGS</span></span></span><span class="sw-vinyl-glow" aria-hidden="true"></span></button><button id="party-mute" aria-label="Mute music">Sound on</button><button id="party-home">Back to the house</button></div>
     <button id="bin-encore" hidden disabled aria-label="Shake the bin"></button>
     <p id="party-announcement" class="sr-only" role="status" aria-live="polite"></p>
     <audio id="party-music" src="./assets/audio/stayin-alive.mp3" preload="none" loop></audio>
@@ -36,6 +36,6 @@
     <section id="ending" hidden aria-labelledby="end-title"><div class="end-card"><span class="eyebrow" id="end-kicker">THE BEST PART</span><h2 id="end-title">Time together.</h2><p id="end-copy">The best days are the ones we spend together.<br>Happy birthday, Dad.</p><button id="home">Back to the house <span>↗</span></button></div></section>
     <section id="error" hidden><h2>Your birthday adventure needs 3D graphics.</h2><p>Try opening this page in a recent version of Safari, Chrome, or Edge.</p><button onclick="location.reload()">Try again</button></section>
   </main>
-  <script type="module" src="./main.js?v=4"></script>
+  <script type="module" src="./main.js?v=5"></script>
 </body>
 </html>
