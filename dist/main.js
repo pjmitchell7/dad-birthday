@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { createHome } from './house.js';
-import { createCinema } from './cinema.js';
+import { createCinema } from './cinema.js?v=4';
 import { createParty } from './party.js';
 import { createSongWheel } from './song-wheel.js';
 import { createHighwayScene } from './highway-scene.js';
 import { createGymScene } from './gym-scene.js';
-import { createDad } from './assets/avatar-v2.js?v=3';
+import { createDad } from './assets/avatar-v2.js?v=4';
 import { createCar } from './assets/cars-v3.js?v=3';
 import { mergeStaticChildren } from './assets/mergeStaticChildren.js';
 import { loadSurfaces, applySurfaces } from './surfaces.js';
@@ -206,4 +206,4 @@ canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();$('err
 await party.warmup(renderer,camera,()=>pipeline.render());
 home.group.visible=silver.group.visible=blue.group.visible=false;
 for(const [vignette,outfit]of[[cinemaData,'movie'],[gymScene,'gym'],[highway,'drive']]){vignette.group.visible=true;dad.setOutfit(outfit);camera.position.copy(vignette.cameraPosition);camera.lookAt(vignette.cameraTarget);await renderer.compileAsync(scene,camera);pipeline.render();vignette.group.visible=false;}
-home.group.visible=silver.group.visible=blue.group.visible=true;dad.setOutfit('default');resize();start=performance.now();tick();$('loading').style.opacity='0';setTimeout(()=>$('loading').remove(),600);window.appReady=true;window.mainApp={get phase(){return phase;},select,celebrate,reset,songWheel,rememberActivity,visited,syncUnlock,get globalTime(){return globalTime;}};
+home.group.visible=silver.group.visible=blue.group.visible=true;dad.setOutfit('default');resize();start=performance.now();tick();$('loading').style.opacity='0';setTimeout(()=>$('loading').remove(),600);window.appReady=true;window.mainApp={get phase(){return phase;},select,celebrate,reset,songWheel,rememberActivity,visited,syncUnlock,get globalTime(){return globalTime;},cinemaData,dad,camera,scene};

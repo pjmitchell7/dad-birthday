@@ -282,8 +282,8 @@ export async function createDad(options = {}) {
     model.updateWorldMatrix(true,true);
     for(const side of ['L','R']){
       const sign=side==='L'?1:-1;
-      // At the intended world hip height .99, these foot targets meet y=0.
-      solveLimb('upperleg01.'+side,'lowerleg01.'+side,'foot.'+side,[sign*.21,.410,.64],[sign*.25,1.15,.85]);
+      // Leg solve keeps thighs and knees resting flush on the cushion surface (world Y >= 0.94)
+      solveLimb('upperleg01.'+side,'lowerleg01.'+side,'foot.'+side,[sign*.20,.70,.54],[sign*.22,1.35,.70]);
       worldOrientation(boneMap['foot.'+side],model.getWorldQuaternion(new THREE.Quaternion()));
       const hand=side==='L'?[.22,1.40,.43]:[-.25,1.35,.43];
       solveLimb('upperarm01.'+side,'lowerarm01.'+side,'wrist.'+side,hand,[sign*.51,1.45,.11]);
